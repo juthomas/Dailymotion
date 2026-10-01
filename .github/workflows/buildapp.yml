@@ -173,6 +173,15 @@ jobs:
               raise SystemExit("YouPiP pattern not found")
           pip.write_text(src2)
           print("patched", pip)
+          overlay = Path("Tweaks/YTVideoOverlay/Tweak.x")
+          src = overlay.read_text()
+          old = "return topControls(self, %orig);"
+          new = "id controls = %orig;\n    return topControls(self, controls);"
+          count = src.count(old)
+          if count != 2:
+              raise SystemExit(f"YTVideoOverlay pattern count {count}")
+          overlay.write_text(src.replace(old, new))
+          print("patched", overlay, count)
           PY
           make package THEOS_PACKAGE_SCHEME=rootless IPA=Payload/YouTube.app FINALPACKAGE=1
           echo "package=$(ls -t packages | head -n1)" >>$GITHUB_OUTPUT
