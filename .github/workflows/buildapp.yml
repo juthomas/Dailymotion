@@ -138,7 +138,42 @@ jobs:
           cd ${{ github.workspace }}/main
           sed -i '' "27s#.*#BUNDLE_ID = ${{ env.BUNDLE_ID }}#g" Makefile
           sed -i '' "26s#.*#DISPLAY_NAME = ${{ env.APP_NAME }}#g" Makefile
-          perl -i -0pe 's/NSMutableArray \*mutableCategories = %orig\.mutableCopy;/NSArray *categories = %orig;\n    NSMutableArray *mutableCategories = categories.mutableCopy;/' Tweaks/Return-YouTube-Dislikes/Settings.x
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path("Tweaks")
+          copy_re = re.compile(r'NSMutableArray\s*\*\s*(\w+)\s*=\s*%orig\.mutableCopy\s*;')
+          for path in root.rglob("*"):
+              if path.suffix not in {".x", ".xm"}:
+                  continue
+              text = path.read_text()
+              new, n = copy_re.subn(
+                  lambda m: (
+                      f"NSArray *{m.group(1)}Orig = %orig;\n"
+                      f"    NSMutableArray *{m.group(1)} = {m.group(1)}Orig.mutableCopy;"
+                  ),
+                  text,
+              )
+              if n:
+                  path.write_text(new)
+                  print(f"patched {path} ({n})")
+          
+          pip = Path("Tweaks/YouPiP/LegacyPiPCompat.x")
+          src = pip.read_text()
+          src2 = src.replace(
+              "return initPlayerPiPControllerIfNeeded(%orig, delegate, nil);",
+              "id controller = %orig;\n    return initPlayerPiPControllerIfNeeded(controller, delegate, nil);",
+              1,
+          ).replace(
+              "return initPlayerPiPControllerIfNeeded(%orig, delegate, parentResponder);",
+              "id controller = %orig;\n    return initPlayerPiPControllerIfNeeded(controller, delegate, parentResponder);",
+              1,
+          )
+          if src2 == src:
+              raise SystemExit("YouPiP pattern not found")
+          pip.write_text(src2)
+          print("patched", pip)
+          PY
           make package THEOS_PACKAGE_SCHEME=rootless IPA=Payload/YouTube.app FINALPACKAGE=1
           echo "package=$(ls -t packages | head -n1)" >>$GITHUB_OUTPUT
           echo -e "==> \033[1mSHASUM256: $(shasum -a 256 packages/*.ipa | cut -f1 -d' ')\033[0m"
