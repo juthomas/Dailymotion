@@ -182,6 +182,15 @@ jobs:
               raise SystemExit(f"YTVideoOverlay pattern count {count}")
           overlay.write_text(src.replace(old, new))
           print("patched", overlay, count)
+          ytx = Path("Tweaks/YouTube-X/Tweak.x")
+          src = ytx.read_text()
+          old = "- (void)decorateContext:(id)context { %orig(nil); }"
+          new = "- (void)decorateContext:(id)context {\n    %orig(nil);\n}"
+          count = src.count(old)
+          if count != 2:
+              raise SystemExit(f"YouTube-X pattern count {count}")
+          ytx.write_text(src.replace(old, new))
+          print("patched", ytx, count)
           PY
           make package THEOS_PACKAGE_SCHEME=rootless IPA=Payload/YouTube.app FINALPACKAGE=1
           echo "package=$(ls -t packages | head -n1)" >>$GITHUB_OUTPUT
