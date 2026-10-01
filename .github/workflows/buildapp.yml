@@ -191,6 +191,30 @@ jobs:
               raise SystemExit(f"YouTube-X pattern count {count}")
           ytx.write_text(src.replace(old, new))
           print("patched", ytx, count)
+          fixes = [
+              ("    else { return %orig; }", "    else {\n        return %orig;\n    }", 7),
+              ("    } else { return %orig; }", "    } else {\n        return %orig;\n    }", 2),
+              ("return IS_ENABLED(kHideCC) ? %orig(NO) : %orig;", "if (IS_ENABLED(kHideCC))\n        return %orig(NO);\n    return %orig;", 1),
+              ("- (void)setFeedHeaderScrollMode:(int)arg1 { %orig(0); }", "- (void)setFeedHeaderScrollMode:(int)arg1 {\n    %orig(0);\n}", 1),
+              ("NSMutableDictionary *info = %orig.mutableCopy;", "NSDictionary *infoOrig = %orig;\n    NSMutableDictionary *info = infoOrig.mutableCopy;", 1),
+              ("%orig; selectedTabIndex = arg1;", "%orig;\n    selectedTabIndex = arg1;", 1),
+              ("return IS_DARK_APPEARANCE_ENABLED ? %orig([UIColor blackColor]) : %orig;", "if (IS_DARK_APPEARANCE_ENABLED)\n        return %orig([UIColor blackColor]);\n    return %orig;", 1),
+              ("return IS_DARK_APPEARANCE_ENABLED ? %orig(raisedColor) : %orig;", "if (IS_DARK_APPEARANCE_ENABLED)\n        return %orig(raisedColor);\n    return %orig;", 2),
+              ("- (void)setLightKeyboard:(BOOL)arg1 { %orig(NO); }", "- (void)setLightKeyboard:(BOOL)arg1 {\n    %orig(NO);\n}", 1),
+          ]
+          sources = [p for p in Path("Sources").rglob("*") if p.suffix in {".x", ".xm"}]
+          for old, new, expected in fixes:
+              found = sum(p.read_text().count(old) for p in sources)
+              if found != expected:
+                  raise SystemExit(f"pattern count {found}, expected {expected}: {old}")
+          for path in sources:
+              text = path.read_text()
+              updated = text
+              for old, new, _ in fixes:
+                  updated = updated.replace(old, new)
+              if updated != text:
+                  path.write_text(updated)
+                  print("patched", path)
           PY
           make package THEOS_PACKAGE_SCHEME=rootless IPA=Payload/YouTube.app FINALPACKAGE=1
           echo "package=$(ls -t packages | head -n1)" >>$GITHUB_OUTPUT
